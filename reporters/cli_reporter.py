@@ -17,19 +17,21 @@ Output format:
 import sys
 
 try:
-    from rich.console import Console  # type: ignore
-    from rich.table   import Table    # type: ignore
-    from rich.panel   import Panel    # type: ignore
-    from rich.text    import Text     # type: ignore
-    from rich         import box      # type: ignore
+    from rich.console import Console  
+    from rich.table   import Table   
+    from rich.panel   import Panel    
+    from rich.text    import Text    
+    from rich         import box    
+
+
+    console = Console(stderr=False)
     _RICH = True
 except ImportError:
     _RICH = False
+    console=None
 
 from analyzers.schema_rules import Issue
 
-
-console = Console(stderr=False)
 
 
 # ─────────────────────────────────────────────
