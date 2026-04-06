@@ -14,8 +14,8 @@ Note: Ye analyzer sirf live DB pe kaam karta hai.
 """
 
 import psycopg2.extras
-from analyzers.schema_rules import Issue
-from connecter.postgres    import PGConnection
+from pg_advisor.analyzers.schema_rules import Issue
+from pg_advisor.connecter.postgres    import PGConnection
 
 
 # Thresholds

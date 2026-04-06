@@ -10,10 +10,10 @@ Usage:
 import sys
 import argparse
 
-from connecter.postgres import resolve_db_url
-from collectors  import db_schema, model_scanner
-from analyzers   import schema_rules, index_rules, query_rules
-from reporters   import cli_reporter
+from pg_advisor.connecter.postgres import resolve_db_url
+from pg_advisor.collectors  import db_schema, model_scanner
+from pg_advisor.analyzers   import schema_rules, index_rules, query_rules
+from pg_advisor.reporters   import cli_reporter
 
 
 def main():

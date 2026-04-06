@@ -13,7 +13,7 @@ Returns: unified dict format jo analyzer samjhe
 """
 
 import psycopg2.extras
-from connecter.postgres import PGConnection
+from pg_advisor.connecter.postgres import PGConnection
 
 
 # ─────────────────────────────────────────────

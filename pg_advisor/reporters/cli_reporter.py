@@ -30,7 +30,7 @@ except ImportError:
     _RICH = False
     console=None
 
-from analyzers.schema_rules import Issue
+from pg_advisor.analyzers.schema_rules import Issue
 
 
 
