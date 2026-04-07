@@ -2,7 +2,7 @@
 
 **PostgreSQL schema & query advisor** — rule-based, no AI, fully deterministic.
 
-Connect karo apna DB, aur ye batayega kya galat hai aur kaise fix karo.
+Connect your database, and it will tell you what's wrong and how to fix it.
 
 ```
 ╭──────────────────────────── pg-advisor Report ────────────────────────────╮
@@ -12,15 +12,15 @@ Connect karo apna DB, aur ye batayega kya galat hai aur kaise fix karo.
 
 ━━━ Table: orders ━━━
   ❌ CRITICAL  FK_WITHOUT_INDEX.user_id
-    'orders.user_id' → 'users' FK hai lekin index nahi — JOINs slow honge.
+    'orders.user_id' has a foreign key to 'users' but no index — JOINs will be slow.
     → CREATE INDEX idx_orders_user_id ON orders(user_id);
 
   ❌ CRITICAL  FLOAT_FOR_MONEY.total
-    'orders.total' FLOAT use kar raha hai — precision errors ho sakte hain.
+    'orders.total' uses FLOAT type — precision errors may occur.
     → ALTER TABLE orders ALTER COLUMN total TYPE NUMERIC(12,2);
 
   ⚠  WARNING   DUPLICATE_INDEX
-    columns ['total'] ke liye 2 indexes hain — ek waste hai.
+    2 indexes exist for columns ['total'] — one is redundant.
     → DROP INDEX idx_orders_total2;
 ```
 
@@ -55,62 +55,62 @@ DATABASE_URL=postgresql://user:pass@localhost/mydb
 pg-advisor analyze
 ```
 
-**Model files bhi scan karo (SQLAlchemy / Django / SQL):**
+**Scan model files too (SQLAlchemy / Django / SQL):**
 ```bash
 pg-advisor analyze --models-path ./models/
-pg-advisor analyze --models-path .        # poora project scan
+pg-advisor analyze --models-path .        # scan entire project
 ```
 
-**Query stats skip karo:**
+**Skip query stats:**
 ```bash
 pg-advisor analyze --skip-queries
 ```
 
 ---
 
-## Kya kya check karta hai
+## What does it check?
 
 ### Schema Rules
 
-| Rule | Kya pakdta hai | Severity |
+| Rule | What it detects | Severity |
 |------|----------------|----------|
-| `MISSING_PK` | Table bina primary key ke | ❌ Critical |
-| `FLOAT_FOR_MONEY` | `price`, `balance`, `total` columns FLOAT mein | ❌ Critical |
-| `FK_WITHOUT_INDEX` | Foreign key column pe index nahi | ❌ Critical |
-| `NULLABLE_PK` | Primary key nullable mark hai | ❌ Critical |
-| `MISSING_CREATED_AT` | `created_at` column nahi hai | ⚠ Warning |
-| `BOOL_AS_INT` | `is_active`, `has_access` INTEGER mein stored | ⚠ Warning |
-| `GOD_TABLE` | 30+ columns wali table — split karo | ⚠ Warning |
-| `MISSING_NOT_NULL` | Email, name, status nullable hain | ℹ Info |
-| `MISSING_UPDATED_AT` | `updated_at` column nahi hai | ℹ Info |
+| `MISSING_PK` | Table without primary key | ❌ Critical |
+| `FLOAT_FOR_MONEY` | `price`, `balance`, `total` columns using FLOAT type | ❌ Critical |
+| `FK_WITHOUT_INDEX` | No index on foreign key column | ❌ Critical |
+| `NULLABLE_PK` | Primary key marked as nullable | ❌ Critical |
+| `MISSING_CREATED_AT` | `created_at` column is missing | ⚠ Warning |
+| `BOOL_AS_INT` | `is_active`, `has_access` stored as INTEGER | ⚠ Warning |
+| `GOD_TABLE` | Table with 30+ columns — consider splitting | ⚠ Warning |
+| `MISSING_NOT_NULL` | Email, name, status columns are nullable | ℹ Info |
+| `MISSING_UPDATED_AT` | `updated_at` column is missing | ℹ Info |
 
 ### Index Rules
 
-| Rule | Kya pakdta hai | Severity |
+| Rule | What it detects | Severity |
 |------|----------------|----------|
-| `DUPLICATE_INDEX` | Same columns pe 2+ indexes | ⚠ Warning |
-| `UNUSED_INDEX` | Index kabhi use nahi hua (live DB se) | ⚠ Warning |
-| `LOW_CARDINALITY_INDEX` | Boolean/status column pe index | ℹ Info |
+| `DUPLICATE_INDEX` | 2+ indexes on the same columns | ⚠ Warning |
+| `UNUSED_INDEX` | Index never used (detected from live DB) | ⚠ Warning |
+| `LOW_CARDINALITY_INDEX` | Index on boolean/status column | ℹ Info |
 
-### Query Rules *(pg_stat_statements required)*
+### Query Rules *(requires pg_stat_statements)*
 
-| Rule | Kya pakdta hai | Severity |
+| Rule | What it detects | Severity |
 |------|----------------|----------|
-| `SLOW_QUERY` | 500ms+ average execution time | ❌ Critical |
-| `HIGH_FREQUENCY_QUERY` | 1000+ calls — cache karo | ⚠ Warning |
-| `SELECT_STAR` | `SELECT *` use ho raha hai | ⚠ Warning |
+| `SLOW_QUERY` | Average execution time ≥ 500ms | ❌ Critical |
+| `HIGH_FREQUENCY_QUERY` | 1000+ calls — consider caching | ⚠ Warning |
+| `SELECT_STAR` | Use of `SELECT *` in queries | ⚠ Warning |
 
 ---
 
 ## Model File Scanning
 
-DB connect kiye bina bhi model files se issues pakad sakta hai:
+Can detect issues from model files without connecting to the database:
 
 **SQLAlchemy:**
 ```python
 class Order(Base):
     __tablename__ = "orders"
-    total = Column(Float)        # ← FLOAT_FOR_MONEY flag karega
+    total = Column(Float)        # ← will flag FLOAT_FOR_MONEY
 ```
 
 **Django ORM:**
@@ -130,17 +130,17 @@ CREATE TABLE orders (
 
 ## pg_stat_statements Setup
 
-Query analysis ke liye ye extension chahiye:
+This extension is required for query analysis:
 
 ```sql
--- postgresql.conf mein add karo:
+-- Add to postgresql.conf:
 -- shared_preload_libraries = 'pg_stat_statements'
 
--- Phir DB mein run karo:
+-- Then run in your database:
 CREATE EXTENSION pg_stat_statements;
 ```
 
-Agar available nahi hai to `--skip-queries` flag use karo — baki sab checks chalte rahenge.
+If not available, use the `--skip-queries` flag — all other checks will continue to work.
 
 ---
 
@@ -151,8 +151,8 @@ pg_advisor/
 ├── connectors/
 │   └── postgres.py       # DB connection, URL resolver
 ├── collectors/
-│   ├── db_schema.py      # Live DB se schema fetch
-│   └── model_scanner.py  # SQLAlchemy/Django/SQL file scan
+│   ├── db_schema.py      # Fetch schema from live DB
+│   └── model_scanner.py  # Scan SQLAlchemy/Django/SQL files
 ├── analyzers/
 │   ├── schema_rules.py   # Schema issues (8 rules)
 │   ├── index_rules.py    # Index issues (3 rules)
@@ -168,7 +168,7 @@ pg_advisor/
 
 - Python 3.10+
 - PostgreSQL 12+
-- `psycopg2-binary`, `rich`, `python-dotenv` (pip install pe auto-install hote hain)
+- `psycopg2-binary`, `rich`, `python-dotenv` (auto-installed via pip)
 
 ---
 
