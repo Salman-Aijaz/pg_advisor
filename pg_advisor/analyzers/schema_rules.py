@@ -81,7 +81,7 @@ def _check_missing_pk(table, pks, columns) -> list[Issue]:
             table    = table,
             column   = None,
             rule     = "MISSING_PK",
-            message  = f"Table '{table}' mein koi primary key nahi hai.",
+            message  = f"Table '{table}' does not have a primary key.",
             fix      = f"ALTER TABLE {table} ADD COLUMN id BIGSERIAL PRIMARY KEY;",
         )]
     return []
@@ -106,8 +106,7 @@ def _check_float_columns(table, columns) -> list[Issue]:
             column   = col_name,
             rule     = "FLOAT_FOR_MONEY",
             message  = (
-                f"'{table}.{col_name}' FLOAT use kar raha hai — "
-                f"floating point precision errors ho sakte hain."
+                f"'{table}.{col_name}' uses FLOAT - this may cause precision issues."
             ),
             fix      = f"ALTER TABLE {table} ALTER COLUMN {col_name} TYPE NUMERIC(12,2);",
         ))
@@ -135,7 +134,7 @@ def _check_missing_timestamps(table, columns) -> list[Issue]:
             table    = table,
             column   = None,
             rule     = "MISSING_CREATED_AT",
-            message  = f"Table '{table}' mein created_at nahi — record kab bana pata nahi chalega.",
+            message  = f"Table '{table}' does not have created_at - cannot determine when record was created.",
             fix      = f"ALTER TABLE {table} ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();",
         ))
 
@@ -145,10 +144,10 @@ def _check_missing_timestamps(table, columns) -> list[Issue]:
             table    = table,
             column   = None,
             rule     = "MISSING_UPDATED_AT",
-            message  = f"Table '{table}' mein updated_at nahi — changes track nahi honge.",
+            message  = f"Table '{table}' does not have updated_at - cannot track changes.",
             fix      = (
                 f"ALTER TABLE {table} ADD COLUMN updated_at TIMESTAMPTZ;\n"
-                f"  -- Trigger bhi lagao jo automatically update kare"
+                f"  -- Also add a trigger to automatically update this column"
             ),
         ))
     return issues
@@ -164,7 +163,7 @@ def _check_nullable_pk(table, pks, columns) -> list[Issue]:
                 table    = table,
                 column   = pk_col,
                 rule     = "NULLABLE_PK",
-                message  = f"'{table}.{pk_col}' primary key hai lekin nullable mark hai — model mein ghalti hai.",
+                message  = f"'{table}.{pk_col}' is a primary key but marked nullable likely a model issue.",
                 fix      = f"ALTER TABLE {table} ALTER COLUMN {pk_col} SET NOT NULL;",
             ))
     return issues
@@ -190,8 +189,8 @@ def _check_fk_without_index(table, foreign_keys, indexes) -> list[Issue]:
                 column   = col,
                 rule     = "FK_WITHOUT_INDEX",
                 message  = (
-                    f"'{table}.{col}' → '{ref}' FK hai lekin index nahi — "
-                    f"JOIN queries bahut slow honge."
+                    f"'{table}.{col}' → '{ref}' is a foreign key without indexed - "
+                    f"JOIN queries will be slow."
                 ),
                 fix      = f"CREATE INDEX idx_{table}_{col} ON {table}({col});",
             ))
@@ -208,10 +207,10 @@ def _check_god_table(table, columns) -> list[Issue]:
             column   = None,
             rule     = "GOD_TABLE",
             message  = (
-                f"Table '{table}' mein {count} columns hain — "
-                f"shayad multiple tables mein split karna chahiye."
+                f"Table '{table}' has {count} columns — "
+                f"consider splitting into multiple tables."
             ),
-            fix      = "Related columns ko alag table mein nikalo — normalization karo.",
+            fix      = "Move related columns to separate tables apply normalization.",
         )]
     return []
 
@@ -232,8 +231,7 @@ def _check_boolean_as_int(table, columns) -> list[Issue]:
                 column   = col_name,
                 rule     = "BOOL_AS_INT",
                 message  = (
-                    f"'{table}.{col_name}' boolean jaisa naam hai lekin "
-                    f"type '{col_type}' hai."
+                    f"'{table}.{col_name}' looks like a boolean but has type {col_type} - "
                 ),
                 fix      = f"ALTER TABLE {table} ALTER COLUMN {col_name} TYPE BOOLEAN USING {col_name}::boolean;",
             ))
@@ -260,8 +258,7 @@ def _check_missing_not_null(table, columns) -> list[Issue]:
                 column   = col_name,
                 rule     = "MISSING_NOT_NULL",
                 message  = (
-                    f"'{table}.{col_name}' nullable hai — "
-                    f"yahan NULL allow karna sahi hai?"
+                    f"'{table}.{col_name}' is nullable is allowing NULL really intended? "
                 ),
                 fix      = f"ALTER TABLE {table} ALTER COLUMN {col_name} SET NOT NULL;",
             ))

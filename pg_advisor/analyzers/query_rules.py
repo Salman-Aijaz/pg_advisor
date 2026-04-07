@@ -44,8 +44,8 @@ def analyze_live(db_url: str) -> list[Issue]:
                     table    = "—",
                     column   = None,
                     rule     = "NO_STAT_STATEMENTS",
-                    message  = "pg_stat_statements extension nahi hai — query analysis skip.",
-                    fix      = "CREATE EXTENSION pg_stat_statements;  -- postgresql.conf mein bhi add karo",
+                    message  = "pg_stat_statements extension is not enabled — query analysis skipped.",
+                    fix      = "CREATE EXTENSION pg_stat_statements;  -- also enable in postgresql.conf",
                 ))
                 return issues
 
@@ -59,8 +59,8 @@ def analyze_live(db_url: str) -> list[Issue]:
             table    = "—",
             column   = None,
             rule     = "QUERY_ANALYSIS_FAILED",
-            message  = f"Query analysis nahi ho saki: {e}",
-            fix      = "pg_stat_statements aur permissions check karo.",
+            message  = f"Query analysis could not be performed. {e}",
+            fix      = "Check pg_stat_statements and permissions.",
         ))
 
     return issues
@@ -103,11 +103,11 @@ def _check_slow_queries(cur) -> list[Issue]:
             column   = None,
             rule     = "SLOW_QUERY",
             message  = (
-                f"Slow query detected ({row['mean_ms']}ms avg, "
+                f"Slow query detected ({row['mean_ms']} ms avg, "
                 f"{row['calls']} calls):\n    {short_q}"
             ),
-            fix      = "EXPLAIN ANALYZE chalao aur index check karo.",
-        ))
+            fix = "Run EXPLAIN ANALYZE and check indexing.",
+    ))
     return issues
 
 
@@ -139,7 +139,7 @@ def _check_high_call_queries(cur) -> list[Issue]:
                 f"High frequency query ({row['calls']} calls, "
                 f"{row['mean_ms']}ms avg):\n    {short_q}"
             ),
-            fix      = "Cache karo (Redis/Memcached) ya prepared statement use karo.",
+            fix      = "Use caching (Redis/Memcached) or prepared statements.",
         ))
     return issues
 
@@ -164,8 +164,8 @@ def _check_select_star(cur) -> list[Issue]:
             table    = "—",
             column   = None,
             rule     = "SELECT_STAR",
-            message  = f"SELECT * use ho raha hai:\n    {short_q}",
-            fix      = "Sirf zaruri columns select karo — SELECT col1, col2 FROM ...",
+            message  = f"SELECT * is being used\n    {short_q}",
+            fix      = "Select only required columns - e.g. SELECT col1, col2 FROM ...",
         ))
     return issues
 

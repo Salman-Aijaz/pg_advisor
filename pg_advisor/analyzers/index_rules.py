@@ -34,7 +34,6 @@ def analyze(schema: dict) -> list[Issue]:
 
 
 def _check_duplicate_indexes(table, indexes) -> list[Issue]:
-    """Rule 1: Same columns pe 2+ indexes hain — ek waste hai."""
     issues  = []
     seen    = {}
 
@@ -47,25 +46,22 @@ def _check_duplicate_indexes(table, indexes) -> list[Issue]:
                 column   = None,
                 rule     = "DUPLICATE_INDEX",
                 message  = (
-                    f"'{table}' pe columns {list(key)} ke liye "
-                    f"duplicate index hai: '{idx['name']}' aur '{seen[key]}'."
+                    f"Duplicate index found on '{table}' for columns {list(key)}: "
+                    f"'{idx['name']}' and '{seen[key]}'."
                 ),
-                fix      = f"DROP INDEX {idx['name']};  -- ya '{seen[key]}' drop karo",
+                fix      = f"DROP INDEX {idx['name']};  -- or drop '{seen[key]}'",
             ))
         else:
             seen[key] = idx["name"]
     return issues
 
-
 def _check_low_cardinality_index(table, indexes, columns) -> list[Issue]:
-    """Rule 2: Boolean ya status column pe index — usually useless."""
     issues = []
     low_cardinality_types = {"boolean", "bool"}
     low_cardinality_names = {"status", "is_active", "is_deleted",
                               "gender", "type", "flag"}
 
     for idx in indexes:
-        # Skip composite indexes
         if len(idx.get("columns", [])) != 1:
             continue
 
@@ -83,16 +79,15 @@ def _check_low_cardinality_index(table, indexes, columns) -> list[Issue]:
                 column   = col,
                 rule     = "LOW_CARDINALITY_INDEX",
                 message  = (
-                    f"'{table}.{col}' pe index hai lekin ye column "
-                    f"low-cardinality lag raha hai — index ka faida kam hoga."
+                    f"Index exists on '{table}.{col}', but this appears to be a "
+                    f"low-cardinality column — index benefit will be limited."
                 ),
                 fix      = (
                     f"DROP INDEX {idx['name']};  "
-                    f"-- Partial index soch sako: CREATE INDEX ON {table}({col}) WHERE {col} = true;"
+                    f"-- Consider partial index: CREATE INDEX ON {table}({col}) WHERE {col} = true;"
                 ),
             ))
     return issues
-
 
 # ─────────────────────────────────────────────
 # Live DB rules (pg_stat se)
@@ -111,6 +106,8 @@ def analyze_live(db_url: str) -> list[Issue]:
     except Exception as e:
         print(f"  [index_rules] Live check skip: {e}")
     return issues
+
+
 
 
 def _check_unused_indexes(cur) -> list[Issue]:
@@ -137,8 +134,8 @@ def _check_unused_indexes(cur) -> list[Issue]:
             rule     = "UNUSED_INDEX",
             message  = (
                 f"Index '{row['index_name']}' on '{row['table_name']}' "
-                f"kabhi use nahi hua (idx_scan = 0)."
+                f"has never been used (idx_scan = 0)."
             ),
-            fix      = f"DROP INDEX {row['index_name']};  -- pehle verify karo",
+            fix      = f"DROP INDEX {row['index_name']};  -- verify before dropping",
         ))
     return issues
