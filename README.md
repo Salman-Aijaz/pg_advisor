@@ -68,6 +68,48 @@ pg-advisor analyze --skip-queries
 
 ---
 
+## Output & Reports
+
+After every run, pg-advisor prints a colored summary to the terminal. It then prompts you to save a Markdown report:
+
+```
+──────────────────────────────────────────────────
+  Markdown (.md) report file save karein? (yes/no):
+```
+
+Answer `yes` and the file is written immediately:
+
+```
+  ✅ Report saved at: /your/project/pgadvisor_report/pg_advisor_report_20260408_143022.md
+```
+
+**Skip the prompt with flags:**
+
+```bash
+pg-advisor analyze ... --save-report   # always save, no prompt
+pg-advisor analyze ... --no-report     # never save, no prompt (CI/CD)
+```
+
+### Report folder & file naming
+
+| Detail | Value |
+|--------|-------|
+| Folder | `pgadvisor_report/` — auto-created in your current working directory on first run |
+| Filename | `pg_advisor_report_YYYYMMDD_HHMMSS.md` |
+| Example | `pgadvisor_report/pg_advisor_report_20260408_143022.md` |
+| Encoding | UTF-8 |
+
+The folder is created automatically — no setup needed. Each run produces a uniquely timestamped file; existing reports are never overwritten.
+
+### What the Markdown report contains
+
+- **Summary header** — database, timestamp, critical / warning / info counts
+- **Issue summary table** — every issue across all tables in one place
+- **Per-table sections** — each issue with severity, message, and a ready-to-run SQL fix block
+- **Rule reference** — full list of all rules and what they check
+
+---
+
 ## What does it check?
 
 ### Schema Rules
@@ -158,7 +200,8 @@ pg_advisor/
 │   ├── index_rules.py    # Index issues (3 rules)
 │   └── query_rules.py    # Query issues (3 rules)
 ├── reporters/
-│   └── cli_reporter.py   # Colored terminal output
+│   ├── cli_reporter.py   # Colored terminal output
+│   └── md_reporter.py    # Markdown report generator
 └── cli.py                # Entry point
 ```
 
