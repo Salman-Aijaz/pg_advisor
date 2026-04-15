@@ -6,14 +6,11 @@ import sys
 import argparse
 
 from pg_advisor.connecter.postgres import resolve_db_url
-from pg_advisor.collectors          import db_schema, model_scanner
-from pg_advisor.analyzers           import schema_rules, index_rules, query_rules
-from pg_advisor.reporters           import cli_reporter, md_reporter
+from pg_advisor.collectors import db_schema, model_scanner
+from pg_advisor.analyzers  import schema_rules, index_rules, query_rules
+from pg_advisor.analyzers  import hypopg_rules, activity_rules
+from pg_advisor.reporters  import cli_reporter, md_reporter
 
-
-# ─────────────────────────────────────────────
-# Custom formatter — wider help, aligned columns
-# ─────────────────────────────────────────────
 
 class _HelpFormatter(argparse.RawDescriptionHelpFormatter):
     def __init__(self, *args, **kwargs):
@@ -22,10 +19,6 @@ class _HelpFormatter(argparse.RawDescriptionHelpFormatter):
         super().__init__(*args, **kwargs)
 
 
-# ─────────────────────────────────────────────
-# CLI definition
-# ─────────────────────────────────────────────
-
 MAIN_DESCRIPTION = """\
 pg-advisor — PostgreSQL Schema & Query Advisor
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -33,12 +26,14 @@ Connects to your PostgreSQL database, scans your schema and queries,
 and reports actionable issues with ready-to-run SQL fixes.
 
   Detects: missing indexes, wrong data types, slow queries,
-           duplicate indexes, missing constraints, and more.
+           duplicate indexes, missing constraints, lock waits,
+           idle-in-transaction connections, and more.
 
 Examples:
   pg-advisor analyze postgresql://user:pass@localhost/mydb
   pg-advisor analyze --models-path ./models/
   pg-advisor analyze --save-report --skip-queries
+  pg-advisor analyze --skip-activity   # skip live monitoring
 """
 
 ANALYZE_DESCRIPTION = """\
@@ -53,89 +48,79 @@ Examples:
   pg-advisor analyze --models-path ./models/      # also scan model files
   pg-advisor analyze --save-report                # auto-save Markdown report
   pg-advisor analyze --skip-queries --no-report   # schema only, no report
+  pg-advisor analyze --skip-activity              # skip pg_stat_activity checks
 """
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog             = "pg-advisor",
-        description      = MAIN_DESCRIPTION,
-        formatter_class  = _HelpFormatter,
-        add_help         = True,
+        prog            = "pg-advisor",
+        description     = MAIN_DESCRIPTION,
+        formatter_class = _HelpFormatter,
     )
-    parser.add_argument(
-        "--version", action="version", version="pg-advisor 0.1.0",
-    )
+    parser.add_argument("--version", action="version", version="pg-advisor 0.2.0")
 
     sub = parser.add_subparsers(
-        dest        = "command",
-        title       = "Available commands",
-        metavar     = "<command>",
+        dest    = "command",
+        title   = "Available commands",
+        metavar = "<command>",
     )
 
-    # ── analyze subcommand ────────────────────
     analyze_cmd = sub.add_parser(
         "analyze",
         help            = "Scan a database and report issues",
         description     = ANALYZE_DESCRIPTION,
         formatter_class = _HelpFormatter,
-        add_help        = True,
     )
 
     analyze_cmd.add_argument(
-        "db_url",
-        nargs   = "?",
-        default = None,
-        metavar = "DATABASE_URL",
-        help    = (
+        "db_url", nargs="?", default=None, metavar="DATABASE_URL",
+        help=(
             "PostgreSQL connection URL.\n"
             "Format : postgresql://user:password@host:port/dbname\n"
             "Example: postgresql://postgres:secret@localhost:5432/myapp\n"
-            "Tip    : Omit this to read from the DATABASE_URL env variable\n"
-            "         or a .env file in your current directory."
+            "Tip    : Omit to read from DATABASE_URL env variable or .env file."
         ),
     )
-
     analyze_cmd.add_argument(
-        "--models-path",
-        metavar = "PATH",
-        default = None,
-        help    = (
-            "Path to a model file or folder to scan for schema issues\n"
-            "without a live DB connection.\n"
+        "--models-path", metavar="PATH", default=None,
+        help=(
+            "Path to model file or folder — scan without live DB.\n"
             "Supports: SQLAlchemy (models.py), Django ORM, plain .sql files.\n"
-            "Example : --models-path ./app/models/\n"
-            "Example : --models-path .  (scans entire project)"
+            "Example : --models-path ./app/models/"
         ),
     )
-
     analyze_cmd.add_argument(
-        "--skip-queries",
-        action  = "store_true",
-        help    = (
+        "--skip-queries", action="store_true",
+        help=(
             "Skip slow-query and SELECT * analysis.\n"
-            "Use this if pg_stat_statements is not installed,\n"
-            "or to speed up the scan on large databases."
+            "Use if pg_stat_statements is not installed."
         ),
     )
-
     analyze_cmd.add_argument(
-        "--save-report",
-        action  = "store_true",
-        help    = (
-            "Automatically save a Markdown (.md) report after the scan\n"
-            "without prompting. The file is saved to:\n"
-            "  ./pgadvisor_report/pg_advisor_report_YYYYMMDD_HHMMSS.md"
+        "--skip-hypopg", action="store_true",
+        help=(
+            "Skip hypothetical index testing via hypopg.\n"
+            "Use if hypopg extension is not installed."
         ),
     )
-
     analyze_cmd.add_argument(
-        "--no-report",
-        action  = "store_true",
-        help    = (
-            "Do not save a Markdown report and skip the prompt.\n"
-            "Useful in CI/CD pipelines or automated scripts."
+        "--skip-activity", action="store_true",
+        help=(
+            "Skip live connection monitoring (pg_stat_activity).\n"
+            "Skips: long queries, idle-in-transaction, lock waits, connection pool."
         ),
+    )
+    analyze_cmd.add_argument(
+        "--save-report", action="store_true",
+        help=(
+            "Automatically save a Markdown (.md) report — no prompt.\n"
+            "Saved to: ./pgadvisor_report/pg_advisor_report_YYYYMMDD_HHMMSS.md"
+        ),
+    )
+    analyze_cmd.add_argument(
+        "--no-report", action="store_true",
+        help="Do not save a Markdown report. Useful in CI/CD pipelines.",
     )
 
     args = parser.parse_args()
@@ -145,10 +130,6 @@ def main():
     else:
         parser.print_help()
 
-
-# ─────────────────────────────────────────────
-# Core analyze flow
-# ─────────────────────────────────────────────
 
 def run_analyze(args):
     all_issues = []
@@ -161,7 +142,6 @@ def run_analyze(args):
         sys.exit(1)
 
     source_label = db_url.split("@")[-1]
-
     _log("Connecting to database...")
 
     # Step 2: Live DB schema
@@ -181,12 +161,26 @@ def run_analyze(args):
 
     # Step 3: Query stats
     if not args.skip_queries:
-        _log("Analyzing query statistics...")
+        _log("Analyzing query statistics (pg_stat_statements)...")
         all_issues += query_rules.analyze_live(db_url)
     else:
         _log("Query analysis skipped (--skip-queries).")
 
-    # Step 4: Model file scan
+    # Step 4: Hypothetical index testing (hypopg)
+    if not args.skip_hypopg:
+        _log("Testing hypothetical indexes (hypopg)...")
+        all_issues += hypopg_rules.analyze_live(db_url, db_data)
+    else:
+        _log("Hypothetical index testing skipped (--skip-hypopg).")
+
+    # Step 5: Live activity monitoring (pg_stat_activity)
+    if not args.skip_activity:
+        _log("Checking live connection activity (pg_stat_activity)...")
+        all_issues += activity_rules.analyze_live(db_url)
+    else:
+        _log("Activity monitoring skipped (--skip-activity).")
+
+    # Step 6: Model file scan
     if args.models_path:
         _log(f"Scanning model files at: {args.models_path}")
         model_data = model_scanner.collect(args.models_path)
@@ -195,16 +189,12 @@ def run_analyze(args):
         all_issues += schema_rules.analyze(model_data)
         all_issues += index_rules.analyze(model_data)
 
-    # Step 5: Terminal report
+    # Step 7: Terminal report
     cli_reporter.report(all_issues, source_label=source_label)
 
-    # Step 6: Markdown report
+    # Step 8: Markdown report
     _handle_report_prompt(all_issues, source_label, args)
 
-
-# ─────────────────────────────────────────────
-# Report prompt
-# ─────────────────────────────────────────────
 
 def _handle_report_prompt(issues, source_label, args):
     if args.no_report:
@@ -236,10 +226,6 @@ def _save_md_report(issues, source_label):
     except RuntimeError as e:
         _err(f"Could not save report:\n  {e}")
 
-
-# ─────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────
 
 def _log(msg: str) -> None:
     print(f"[pg-advisor] {msg}")
