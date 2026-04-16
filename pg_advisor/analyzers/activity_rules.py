@@ -51,8 +51,8 @@ def analyze_live(db_url: str) -> list[Issue]:
             table    = "—",
             column   = None,
             rule     = "ACTIVITY_ERROR",
-            message  = f"pg_stat_activity check fail hua: {e}",
-            fix      = "pg_stat_activity view pe SELECT permission check karo.",
+            message  = f"pg_stat_activity check failed: {e}",
+            fix      = "verify SELECT permission on the pg_stat_activity view.”",
         ))
 
     return issues
@@ -93,7 +93,7 @@ def _check_long_running_queries(cur) -> list[Issue]:
             column   = None,
             rule     = "LONG_RUNNING_QUERY",
             message  = (
-                f"Query {row['duration_sec']}s se chal rahi hai "
+                f"Query {row['duration_sec']}s it is running successfully."
                 f"(user: {row['usename']}, pid: {row['pid']}):\n"
                 f"    {row['short_query']}"
             ),
@@ -133,13 +133,13 @@ def _check_idle_in_transaction(cur) -> list[Issue]:
             column   = None,
             rule     = "IDLE_IN_TRANSACTION",
             message  = (
-                f"Connection {row['idle_sec']}s se idle-in-transaction hai "
-                f"(user: {row['usename']}, pid: {row['pid']}) — locks hold kar raha hai.\n"
+                f"Connection {row['idle_sec']}s it is an idle-in-transaction.\n"
+                f"(user: {row['usename']}, pid: {row['pid']}) — it is holding locks\n"
                 f"    Last query: {row['last_query']}"
             ),
             fix      = (
-                f"SELECT pg_terminate_backend({row['pid']});  -- connection close karo\n"
-                f"  -- App side pe: idle_in_transaction_session_timeout set karo\n"
+                f"SELECT pg_terminate_backend({row['pid']});  -- close connection\n"
+                f"  -- Set idle_in_transaction_session_timeout on the application side.\n"
                 f"  -- ALTER SYSTEM SET idle_in_transaction_session_timeout = '60s';"
             ),
         ))
@@ -183,7 +183,7 @@ def _check_lock_waits(cur) -> list[Issue]:
                 f"    Blocking (pid {row['blocking_pid']}): {row['blocking_query']}"
             ),
             fix      = (
-                f"SELECT pg_cancel_backend({row['blocking_pid']});  -- blocker cancel karo\n"
+                f"SELECT pg_cancel_backend({row['blocking_pid']});  -- cancel blocker\n"
                 f"  -- Root cause: long transactions, missing indexes, or application logic"
             ),
         ))
@@ -234,8 +234,8 @@ def _check_connection_pool(cur) -> list[Issue]:
             f"Idle-in-txn: {row['idle_in_txn']}."
         ),
         fix      = (
-            "-- PgBouncer ya connection pooler lagao\n"
-            "-- ya max_connections badhao (postgresql.conf):\n"
+            "-- Use PgBouncer or a connection pooler\n"
+            "-- or increase max_connections (postgresql.conf):\n"
             "ALTER SYSTEM SET max_connections = 200;\n"
             "SELECT pg_reload_conf();"
         ),

@@ -50,7 +50,7 @@ def analyze_live(db_url: str, schema: dict) -> list[Issue]:
                     table    = "—",
                     column   = None,
                     rule     = "HYPOPG_NOT_INSTALLED",
-                    message  = "hypopg extension nahi hai — hypothetical index testing skip.",
+                    message  = "HypoPG extension is not installed skipping hypothetical index testing.",
                     fix      = "CREATE EXTENSION hypopg;  -- then re-run pg-advisor",
                 ))
                 return issues
@@ -169,8 +169,8 @@ def _test_hypothetical_index(cur, table: str, column: str) -> Issue | None:
             column   = column,
             rule     = "HYPOPG_INDEX_CONFIRMED",
             message  = (
-                f"'{table}.{column}' pe index add karne se query cost "
-                f"{improvement}% kam ho gi — hypopg se verified."
+                f"'{table}.{column}' “By adding the index, the query cost will decrease "
+                f"{improvement}% — verified by HypoPG."
             ),
             fix      = f"CREATE INDEX idx_{table}_{column} ON {table}({column});",
         )
