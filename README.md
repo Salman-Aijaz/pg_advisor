@@ -34,6 +34,61 @@ pip install pg-advisor
 
 ---
 
+## Quick Start
+
+Run this after installing to check your PostgreSQL extension setup:
+
+```bash
+pg-advisor setup postgresql://user:pass@localhost:5432/mydb
+```
+
+Then run the full analysis:
+
+```bash
+pg-advisor analyze postgresql://user:pass@localhost:5432/mydb
+```
+
+---
+
+## Extension Setup
+
+pg-advisor uses three PostgreSQL extensions. Run `pg-advisor setup` to check which ones are available on your database.
+
+| Extension | Type | Used for | Required? |
+|-----------|------|----------|-----------|
+| `pg_stat_activity` | Built-in | Live query monitoring, lock waits, connection pool | Auto-available |
+| `pg_stat_statements` | Built-in, off by default | Slow queries, SELECT * detection, high-frequency queries | Optional |
+| `hypopg` | Third-party | Confirms an index will actually improve query cost | Optional |
+
+Missing extensions are skipped gracefully — pg-advisor will still run and report all other issues.
+
+### Enabling pg_stat_statements
+
+```sql
+-- 1. Add to postgresql.conf:
+shared_preload_libraries = 'pg_stat_statements'
+
+-- 2. Restart PostgreSQL, then run in your database:
+CREATE EXTENSION pg_stat_statements;
+```
+
+### Installing hypopg
+
+```bash
+# Ubuntu / Debian
+sudo apt install postgresql-<version>-hypopg
+
+# macOS (Homebrew)
+brew install hypopg
+```
+
+```sql
+-- Then in your database:
+CREATE EXTENSION hypopg;
+```
+
+---
+
 ## Usage
 
 **Option 1 — Direct URL:**
@@ -61,9 +116,11 @@ pg-advisor analyze --models-path ./models/
 pg-advisor analyze --models-path .        # scan entire project
 ```
 
-**Skip query stats:**
+**Skip specific checks:**
 ```bash
-pg-advisor analyze --skip-queries
+pg-advisor analyze --skip-queries     # skip pg_stat_statements checks
+pg-advisor analyze --skip-hypopg      # skip hypothetical index testing
+pg-advisor analyze --skip-activity    # skip live connection monitoring
 ```
 
 ---
@@ -74,7 +131,7 @@ After every run, pg-advisor prints a colored summary to the terminal. It then pr
 
 ```
 ──────────────────────────────────────────────────
-  Markdown (.md) report file save karein? (yes/no):
+  Save Markdown (.md) report? (yes/no):
 ```
 
 Answer `yes` and the file is written immediately:
@@ -142,6 +199,21 @@ The folder is created automatically — no setup needed. Each run produces a uni
 | `HIGH_FREQUENCY_QUERY` | 1000+ calls — consider caching | ⚠ Warning |
 | `SELECT_STAR` | Use of `SELECT *` in queries | ⚠ Warning |
 
+### Activity Rules *(pg_stat_activity — built-in)*
+
+| Rule | What it detects | Severity |
+|------|----------------|----------|
+| `LONG_RUNNING_QUERY` | Query running for 30s+ | ❌ Critical |
+| `IDLE_IN_TRANSACTION` | Connection idle-in-transaction for 60s+ | ❌ Critical |
+| `LOCK_WAIT` | Query blocked waiting for a lock | ❌ Critical |
+| `CONNECTION_POOL_PRESSURE` | 80%+ of max_connections in use | ⚠ Warning |
+
+### Hypothetical Index Rules *(requires hypopg)*
+
+| Rule | What it detects | Severity |
+|------|----------------|----------|
+| `HYPOPG_INDEX_CONFIRMED` | Index verified to reduce query cost | ❌ Critical |
+
 ---
 
 ## Model File Scanning
@@ -170,46 +242,32 @@ CREATE TABLE orders (
 
 ---
 
-## pg_stat_statements Setup
-
-This extension is required for query analysis:
-
-```sql
--- Add to postgresql.conf:
--- shared_preload_libraries = 'pg_stat_statements'
-
--- Then run in your database:
-CREATE EXTENSION pg_stat_statements;
-```
-
-If not available, use the `--skip-queries` flag — all other checks will continue to work.
-
----
-
 ## Project Structure
 
 ```
 pg_advisor/
 ├── connectors/
-│   └── postgres.py       # DB connection, URL resolver
+│   └── postgres.py          # DB connection, URL resolver
 ├── collectors/
-│   ├── db_schema.py      # Fetch schema from live DB
-│   └── model_scanner.py  # Scan SQLAlchemy/Django/SQL files
+│   ├── db_schema.py         # Fetch schema from live DB
+│   └── model_scanner.py     # Scan SQLAlchemy/Django/SQL files
 ├── analyzers/
-│   ├── schema_rules.py   # Schema issues (8 rules)
-│   ├── index_rules.py    # Index issues (3 rules)
-│   └── query_rules.py    # Query issues (3 rules)
+│   ├── schema_rules.py      # Schema issues (9 rules)
+│   ├── index_rules.py       # Index issues (3 rules)
+│   ├── query_rules.py       # Query issues (3 rules)
+│   ├── activity_rules.py    # Live monitoring (4 rules)
+│   └── hypopg_rules.py      # Hypothetical index testing (1 rule)
 ├── reporters/
-│   ├── cli_reporter.py   # Colored terminal output
-│   └── md_reporter.py    # Markdown report generator
-└── cli.py                # Entry point
+│   ├── cli_reporter.py      # Colored terminal output
+│   └── md_reporter.py       # Markdown report generator
+└── cli.py                   # Entry point
 ```
 
 ---
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.11+
 - PostgreSQL 12+
 - `psycopg2-binary`, `rich`, `python-dotenv` (auto-installed via pip)
 

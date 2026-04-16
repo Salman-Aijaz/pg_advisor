@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name        = "pg-advisor"
-version     = "0.1.1"
+version     = "0.2.0"
 description = "PostgreSQL schema & query advisor — rule-based, no AI"
 readme      = "README.md"
 license     = { text = "MIT" }
@@ -43,9 +43,9 @@ dev = [
 pg-advisor = "pg_advisor.cli:main"
 
 [project.urls]
-Homepage   = "https://github.com/Salman-Aijaz/pg_advisor"
-Issues     = "https://github.com/Salman-Aijaz/pg_advisor"
+Homepage = "https://github.com/Salman-Aijaz/pg_advisor"
+Issues   = "https://github.com/Salman-Aijaz/pg_advisor"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["pg_advisor", "pg_advisor.*"]
