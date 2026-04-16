@@ -9,6 +9,8 @@ pg_advisor.egg-info/entry_points.txt
 pg_advisor.egg-info/requires.txt
 pg_advisor.egg-info/top_level.txt
 pg_advisor/analyzers/__init__.py
+pg_advisor/analyzers/activity_rules.py
+pg_advisor/analyzers/hypopg_rules.py
 pg_advisor/analyzers/index_rules.py
 pg_advisor/analyzers/query_rules.py
 pg_advisor/analyzers/schema_rules.py
